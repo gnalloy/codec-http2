@@ -47,9 +47,10 @@ It does not absorb neighboring module responsibilities. Core primitives stay in 
 - `gnalloy.org/codec-http2/scheduler` (`scheduler`)
 
 ## Gnalloy Dependencies
-- `gnalloy.org/gnalloy`
-- `gnalloy.org/codec-http1`
+
 - `gnalloy.org/codec-compression`
+- `gnalloy.org/codec-http1`
+- `gnalloy.org/gnalloy`
 
 ## Common Integration Pattern
 - Frame, header, body, and decoded-content limits must be selected from the trusted boundary of the service.

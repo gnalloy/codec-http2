@@ -47,9 +47,10 @@ GOWORK=off GOTOOLCHAIN=local go test ./... -count=1
 - `gnalloy.org/codec-http2/scheduler`（`scheduler`）
 
 ## Gnalloy 依赖
-- `gnalloy.org/gnalloy`
-- `gnalloy.org/codec-http1`
+
 - `gnalloy.org/codec-compression`
+- `gnalloy.org/codec-http1`
+- `gnalloy.org/gnalloy`
 
 ## 常见集成方式
 - frame、header、body 与 decoded-content 上限必须由服务的可信边界决定。

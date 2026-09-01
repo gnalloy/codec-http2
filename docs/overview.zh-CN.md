@@ -25,11 +25,13 @@ Gnalloy HTTP/2 帧、HPACK、stream 流控、h2c、HTTP/1 桥接与防护编解�
 - `gnalloy.org/codec-http2/scheduler`（`scheduler`）
 
 ## 直接 Gnalloy 依赖
-- `gnalloy.org/gnalloy`
-- `gnalloy.org/codec-http1`
-- `gnalloy.org/codec-compression`
 
-## 当前模块规划中的直接下游
+- `gnalloy.org/codec-compression`
+- `gnalloy.org/codec-http1`
+- `gnalloy.org/gnalloy`
+
+## 当前仓库集合中的直接下游
+
 - `gnalloy.org/recipes`
 
 ## 架构位置

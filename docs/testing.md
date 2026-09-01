@@ -19,9 +19,13 @@ Run focused tests while working on a small behavior change:
 GOWORK=off GOTOOLCHAIN=local go test ./... -run 'TestName' -count=1
 ```
 
-Current discovered test and benchmark entry points:
-- `BenchmarkStreamMultiplexerReadData`
-- `FuzzHTTP2FramePipeline`
+## Discovered Test Entry Points
+
+This inventory is generated from the current `_test.go` files in this repository. It is intentionally complete so documentation review can catch stale test, benchmark, fuzz, and example coverage when code changes.
+
+Total discovered entry points: 62.
+
+### Tests (60)
 - `TestApplyUpgradeHeadersAddsH2CHeaders`
 - `TestCompressorCompressesAcceptedResponseStream`
 - `TestConnectionControllerAppliesAndValidatesSettings`
@@ -32,6 +36,65 @@ Current discovered test and benchmark entry points:
 - `TestConnectionControllerRejectsPushWhenPeerDisabled`
 - `TestControlFrameLimitEncoderRejectsUnflushedControlFrames`
 - `TestDataChunkedInputEmitsEmptyEndStream`
+- `TestDataChunkedInputSplitsByteBufIntoDataFrames`
+- `TestDataCompressingInputStreamsHTTP2DataFrames`
+- `TestDecompressorDecodesGzipDataFrame`
+- `TestEncodeDecodeHTTP2SettingsHeader`
+- `TestFrameDecoderDecodesPayloadZeroCopy`
+- `TestFrameEncoderCoalescesHeaderAndPayload`
+- `TestFrameEncoderWritesHeaderThenPayload`
+- `TestHeaderCodecRoundTripWithContinuation`
+- `TestHeaderDecoderRejectsContinuationWithoutHeaders`
+- `TestHeadersBlockFromRequestBuildsPseudoHeadersFirst`
+- `TestMaxRstFrameDecoderExpiresWindow`
+- `TestMaxRstFrameDecoderRejectsRstFlood`
+- `TestOutboundFlowControllerAppliesInitialWindowSettings`
+- `TestOutboundFlowControllerPassesDataWithinWindow`
+- `TestOutboundFlowControllerQueuesDataUntilWindowUpdate`
+- `TestPrefaceDecoderConsumesFragmentedPrefaceAndForwardsRemainingFrame`
+- `TestPrefaceEncoderWritesClientPrefaceOnActive`
+- `TestRequestFromHeadersBlockMapsPseudoHeaders`
+- `TestResponseBridgeMapsStatus`
+- `TestSettingsAckHandlerAcknowledgesPeerSettingsAndFiresEvent`
+- `TestSettingsAckHandlerDoesNotAckAck`
+- `TestSettingsAckHasNoPayload`
+- `TestStreamBufferingEncoderDrainsOnSettingsIncrease`
+- `TestStreamBufferingEncoderDrainsWhenActiveStreamCloses`
+- `TestStreamBufferingEncoderRejectsQueueOverflow`
+- `TestStreamChildHandlerBindsOutboundStreamID`
+- `TestStreamChildHandlerClosesChildOnRST`
+- `TestStreamChildHandlerRoutesInboundFramesToChild`
+- `TestStreamChildRejectsMismatchedStreamID`
+- `TestStreamFrameToHTTPObjectCodecClientInboundDataAndTrailers`
+- `TestStreamFrameToHTTPObjectCodecOutboundResponseWithBody`
+- `TestStreamFrameToHTTPObjectCodecServerInboundEndStream`
+- `TestStreamMultiplexerAcceptsDecodedHeadersBlock`
+- `TestStreamMultiplexerAllowsServerResponseOnClientStream`
+- `TestStreamMultiplexerAppliesWindowUpdate`
+- `TestStreamMultiplexerClosesAfterBothHalfCloses`
+- `TestStreamMultiplexerEmitsStreamLifecycleEvents`
+- `TestStreamMultiplexerRejectsOutboundFlowControlViolation`
+- `TestStreamMultiplexerRejectsWrongLocalStreamParity`
+- `TestStreamStateTransitions`
+- `TestTypedFrameDecoderAcceptsEmptyPayloadFrames`
+- `TestTypedFrameDecoderParsesHeadersWithPriority`
+- `TestTypedFrameDecoderReleasesInvalidFrameOnce`
+- `TestTypedFrameDecoderRetainsUnknownFramePayload`
+- `TestTypedFrameEncoderKeepsDataPayloadZeroCopy`
+- `TestTypedFrameEncoderReleasesFrameOnWriteError`
+- `TestTypedFrameEncoderWritesSettingsFrame`
+- `TestWeightedFairQueueDistributorHonorsWeights`
+- `TestWeightedFairQueueDistributorPropagatesWriterError`
+- `TestWeightedFairQueueDistributorSkipsInactiveStreams`
+
+### Benchmarks (1)
+- `BenchmarkStreamMultiplexerReadData`
+
+### Fuzz Targets (1)
+- `FuzzHTTP2FramePipeline`
+
+### Examples (0)
+- No Example functions are currently declared.
 
 ## Race Checks
 
