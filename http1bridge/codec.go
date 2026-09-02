@@ -63,9 +63,19 @@ func (c *StreamFrameToHTTPObjectCodec) ChannelInactive(ctx *channel.HandlerConte
 func (c *StreamFrameToHTTPObjectCodec) Write(ctx *channel.HandlerContext, msg any) error {
 	switch obj := msg.(type) {
 	case http1.Request:
-		return c.writeRequest(ctx, obj)
+		return c.writeRequest(ctx, &obj, false)
+	case *http1.Request:
+		if obj == nil {
+			return ctx.Write(msg)
+		}
+		return c.writeRequest(ctx, obj, true)
 	case http1.Response:
-		return c.writeResponse(ctx, obj)
+		return c.writeResponse(ctx, &obj, false)
+	case *http1.Response:
+		if obj == nil {
+			return ctx.Write(msg)
+		}
+		return c.writeResponse(ctx, obj, true)
 	case http1.HTTPContent:
 		return c.writeDataFrame(ctx, obj.Data, 0)
 	case http1.LastHTTPContent:
@@ -87,7 +97,7 @@ func (c *StreamFrameToHTTPObjectCodec) readHeaders(ctx *channel.HandlerContext, 
 			return
 		}
 		c.reading = !block.EndStream
-		ctx.FireChannelRead(req)
+		ctx.FireChannelRead(&req)
 		c.fireEmptyLastIfNeeded(ctx, block.EndStream)
 		return
 	}
@@ -97,7 +107,7 @@ func (c *StreamFrameToHTTPObjectCodec) readHeaders(ctx *channel.HandlerContext, 
 		return
 	}
 	c.reading = !block.EndStream
-	ctx.FireChannelRead(resp)
+	ctx.FireChannelRead(&resp)
 	c.fireEmptyLastIfNeeded(ctx, block.EndStream)
 }
 
@@ -138,10 +148,13 @@ func (c *StreamFrameToHTTPObjectCodec) readPushPromise(ctx *channel.HandlerConte
 	ctx.FireChannelRead(PushPromise{StreamID: block.StreamID, PromisedStreamID: block.PromisedStreamID, Request: req})
 }
 
-func (c *StreamFrameToHTTPObjectCodec) writeRequest(ctx *channel.HandlerContext, req http1.Request) error {
+func (c *StreamFrameToHTTPObjectCodec) writeRequest(ctx *channel.HandlerContext, req *http1.Request, release bool) error {
+	if release {
+		defer req.Release()
+	}
 	body := req.Body
 	req.Body = nil
-	if err := ctx.Write(HeadersBlockFromRequest(c.streamID(), req, body == nil)); err != nil {
+	if err := ctx.Write(HeadersBlockFromRequest(c.streamID(), *req, body == nil)); err != nil {
 		if body != nil {
 			body.Release()
 		}
@@ -150,10 +163,13 @@ func (c *StreamFrameToHTTPObjectCodec) writeRequest(ctx *channel.HandlerContext,
 	return c.writeDataFrame(ctx, body, http2.FlagEndStream)
 }
 
-func (c *StreamFrameToHTTPObjectCodec) writeResponse(ctx *channel.HandlerContext, resp http1.Response) error {
+func (c *StreamFrameToHTTPObjectCodec) writeResponse(ctx *channel.HandlerContext, resp *http1.Response, release bool) error {
+	if release {
+		defer resp.Release()
+	}
 	body := resp.Body
 	resp.Body = nil
-	if err := ctx.Write(HeadersBlockFromResponse(c.streamID(), resp, body == nil)); err != nil {
+	if err := ctx.Write(HeadersBlockFromResponse(c.streamID(), *resp, body == nil)); err != nil {
 		if body != nil {
 			body.Release()
 		}

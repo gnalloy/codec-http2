@@ -29,7 +29,8 @@ func TestStreamFrameToHTTPObjectCodecServerInboundEndStream(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := readInboundAs[http1.Request](t, ch)
+	req := readInboundAs[*http1.Request](t, ch)
+	defer req.Release()
 	if req.Method != "GET" || req.URI != "/items" || req.Headers.Get("Host") != "example.test" {
 		t.Fatalf("request=%+v", req)
 	}
@@ -70,7 +71,8 @@ func TestStreamFrameToHTTPObjectCodecClientInboundDataAndTrailers(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	resp := readInboundAs[http1.Response](t, ch)
+	resp := readInboundAs[*http1.Response](t, ch)
+	defer resp.Release()
 	if resp.StatusCode != 200 || resp.Headers.Get("content-type") != "text/plain" {
 		t.Fatalf("response=%+v", resp)
 	}
@@ -96,11 +98,11 @@ func TestStreamFrameToHTTPObjectCodecOutboundResponseWithBody(t *testing.T) {
 	if _, err := body.WriteBytes([]byte("pong")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ch.WriteOutbound(http1.Response{
-		StatusCode: 200,
-		Headers:    http1.Headers{"content-length": "4"},
-		Body:       body,
-	}); err != nil {
+	resp := http1.AcquireResponse()
+	resp.StatusCode = 200
+	resp.Headers = http1.Headers{"content-length": "4"}
+	resp.Body = body
+	if _, err := ch.WriteOutbound(resp); err != nil {
 		t.Fatal(err)
 	}
 
