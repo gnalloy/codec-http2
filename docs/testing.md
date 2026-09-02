@@ -51,6 +51,7 @@ Total discovered entry points: 62.
 - `TestOutboundFlowControllerAppliesInitialWindowSettings`
 - `TestOutboundFlowControllerPassesDataWithinWindow`
 - `TestOutboundFlowControllerQueuesDataUntilWindowUpdate`
+- `TestPingAckHandler`
 - `TestPrefaceDecoderConsumesFragmentedPrefaceAndForwardsRemainingFrame`
 - `TestPrefaceEncoderWritesClientPrefaceOnActive`
 - `TestRequestFromHeadersBlockMapsPseudoHeaders`

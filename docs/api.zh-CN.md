@@ -49,6 +49,8 @@ type MultiplexerConfig struct{ ... }
 type OutboundFlowControlConfig struct{ ... }
 type OutboundFlowController struct{ ... }
     func NewOutboundFlowController(cfg OutboundFlowControlConfig) *OutboundFlowController
+type PingAckHandler struct{}
+    func NewPingAckHandler() *PingAckHandler
 type PingFrame struct{ ... }
 type PrefaceDecoder struct{ ... }
     func NewPrefaceDecoder() *PrefaceDecoder

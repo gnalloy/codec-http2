@@ -119,6 +119,45 @@ func TestSettingsAckHandlerDoesNotAckAck(t *testing.T) {
 	}
 }
 
+func TestPingAckHandler(t *testing.T) {
+	tests := []struct {
+		name       string
+		ping       PingFrame
+		wantWrites int
+	}{
+		{name: "peer ping", ping: PingFrame{Data: [8]byte{1, 2, 3, 4, 5, 6, 7, 8}}, wantWrites: 1},
+		{name: "peer ack", ping: PingFrame{Ack: true}, wantWrites: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sink := &captureSink{}
+			recorder := &frameRecorder{}
+			ch := channel.NewLocalChannel(1, buffer.NewHeapAllocator(), sink)
+			if err := ch.Pipeline().AddLast("ack", NewPingAckHandler()); err != nil {
+				t.Fatal(err)
+			}
+			if err := ch.Pipeline().AddLast("recorder", recorder); err != nil {
+				t.Fatal(err)
+			}
+
+			ch.Pipeline().FireChannelRead(tt.ping)
+
+			if len(sink.messages) != tt.wantWrites {
+				t.Fatalf("writes=%d, want=%d", len(sink.messages), tt.wantWrites)
+			}
+			if tt.wantWrites == 1 {
+				ack, ok := sink.messages[0].(PingFrame)
+				if !ok || !ack.Ack || ack.Data != tt.ping.Data {
+					t.Fatalf("ack=%T %+v", sink.messages[0], sink.messages[0])
+				}
+			}
+			if got, ok := recorder.msg.(PingFrame); !ok || got != tt.ping {
+				t.Fatalf("msg=%T %+v, want propagated ping %+v", recorder.msg, recorder.msg, tt.ping)
+			}
+		})
+	}
+}
+
 type prefaceEventRecorder struct {
 	prefaces     int
 	settings     int

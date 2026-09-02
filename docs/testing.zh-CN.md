@@ -51,6 +51,7 @@ GOWORK=off GOTOOLCHAIN=local go test ./... -run 'TestName' -count=1
 - `TestOutboundFlowControllerAppliesInitialWindowSettings`
 - `TestOutboundFlowControllerPassesDataWithinWindow`
 - `TestOutboundFlowControllerQueuesDataUntilWindowUpdate`
+- `TestPingAckHandler`
 - `TestPrefaceDecoderConsumesFragmentedPrefaceAndForwardsRemainingFrame`
 - `TestPrefaceEncoderWritesClientPrefaceOnActive`
 - `TestRequestFromHeadersBlockMapsPseudoHeaders`
