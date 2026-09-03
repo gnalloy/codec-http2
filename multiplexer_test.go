@@ -98,6 +98,47 @@ func TestStreamMultiplexerAllowsServerResponseOnClientStream(t *testing.T) {
 	if mux.ActiveStreams() != 0 {
 		t.Fatalf("active streams=%d, want 0", mux.ActiveStreams())
 	}
+	if len(mux.freeStreams) != 1 {
+		t.Fatalf("retained streams=%d, want 1", len(mux.freeStreams))
+	}
+	first := mux.freeStreams[0]
+	ch.Pipeline().FireChannelRead(HeadersBlock{StreamID: 3, Fields: []HeaderField{{Name: ":method", Value: "GET"}}, EndStream: true})
+	if mux.streams[3] != first {
+		t.Fatal("closed stream state was not reused")
+	}
+	sink.release()
+}
+
+func TestStreamMultiplexerRecyclesAfterSynchronousResponse(t *testing.T) {
+	mux, err := NewStreamMultiplexer(MultiplexerConfig{Server: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder := &synchronousStreamResponder{}
+	sink := &recordingSink{}
+	ch := channel.NewLocalChannel(1, buffer.NewHeapAllocator(), sink)
+	if err := ch.Pipeline().AddLast("mux", mux); err != nil {
+		t.Fatal(err)
+	}
+	if err := ch.Pipeline().AddLast("responder", responder); err != nil {
+		t.Fatal(err)
+	}
+
+	ch.Pipeline().FireChannelRead(HeadersBlock{StreamID: 1, EndStream: true})
+	if responder.err != nil {
+		t.Fatal(responder.err)
+	}
+	if mux.ActiveStreams() != 0 || len(mux.freeStreams) != 1 {
+		t.Fatalf("active=%d retained=%d, want 0/1", mux.ActiveStreams(), len(mux.freeStreams))
+	}
+	retained := mux.freeStreams[0]
+	ch.Pipeline().FireChannelRead(HeadersBlock{StreamID: 3, EndStream: true})
+	if responder.err != nil {
+		t.Fatal(responder.err)
+	}
+	if len(mux.freeStreams) != 1 || mux.freeStreams[0] != retained {
+		t.Fatal("synchronous response did not reuse stream state")
+	}
 	sink.release()
 }
 
@@ -188,6 +229,30 @@ func BenchmarkStreamMultiplexerReadData(b *testing.B) {
 
 type streamEventRecorder struct {
 	events []StreamEvent
+}
+
+type synchronousStreamResponder struct {
+	err error
+}
+
+func (h *synchronousStreamResponder) ChannelRead(ctx *channel.HandlerContext, msg any) {
+	event, ok := msg.(StreamEvent)
+	if !ok {
+		ctx.FireChannelRead(msg)
+		return
+	}
+	defer event.Release()
+	if event.Type != StreamEventRead {
+		return
+	}
+	if _, ok := event.Frame.(HeadersBlock); !ok {
+		return
+	}
+	if err := ctx.Write(HeadersBlock{StreamID: event.StreamID}); err != nil {
+		h.err = err
+		return
+	}
+	h.err = ctx.Write(DataFrame{StreamID: event.StreamID, Flags: FlagEndStream})
 }
 
 func (r *streamEventRecorder) ChannelRead(_ *channel.HandlerContext, msg any) {

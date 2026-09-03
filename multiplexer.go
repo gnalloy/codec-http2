@@ -5,7 +5,10 @@ import (
 	"gnalloy.org/gnalloy/channel"
 )
 
-const defaultInitialWindowSize int32 = 65535
+const (
+	defaultInitialWindowSize int32 = 65535
+	maxRetainedStreams             = 16
+)
 
 // StreamEventType 描述 HTTP/2 stream 在 multiplexer 中产生的事件类型。
 type StreamEventType uint8
@@ -55,13 +58,15 @@ type StreamMultiplexer struct {
 	initialStreamWin int32
 	connSendWindow   int32
 	streams          map[StreamID]*multiplexedStream
+	freeStreams      []*multiplexedStream
 }
 
 type multiplexedStream struct {
-	id         StreamID
-	state      StreamState
-	sendWindow int32
-	recvWindow int32
+	id          StreamID
+	state       StreamState
+	sendWindow  int32
+	recvWindow  int32
+	dispatching bool
 }
 
 // NewStreamMultiplexer 创建 HTTP/2 stream multiplexer。
@@ -158,10 +163,12 @@ func (m *StreamMultiplexer) readHeaderState(ctx *channel.HandlerContext, streamI
 		ctx.FireExceptionCaught(err)
 		return
 	}
+	stream.dispatching = true
 	if created {
 		ctx.FireChannelRead(StreamEvent{Type: StreamEventActive, StreamID: stream.id, State: stream.state})
 	}
 	ctx.FireChannelRead(StreamEvent{Type: StreamEventRead, StreamID: stream.id, State: stream.state, Frame: frame})
+	stream.dispatching = false
 	m.fireClosedIfNeeded(ctx, stream)
 }
 
@@ -186,7 +193,9 @@ func (m *StreamMultiplexer) readData(ctx *channel.HandlerContext, frame DataFram
 			return
 		}
 	}
+	stream.dispatching = true
 	ctx.FireChannelRead(StreamEvent{Type: StreamEventRead, StreamID: stream.id, State: stream.state, Frame: frame})
+	stream.dispatching = false
 	m.fireClosedIfNeeded(ctx, stream)
 }
 
@@ -197,7 +206,9 @@ func (m *StreamMultiplexer) readRSTStream(ctx *channel.HandlerContext, frame RST
 		return
 	}
 	stream.state = StreamClosed
+	stream.dispatching = true
 	ctx.FireChannelRead(StreamEvent{Type: StreamEventRead, StreamID: stream.id, State: stream.state, Frame: frame})
+	stream.dispatching = false
 	m.fireClosedIfNeeded(ctx, stream)
 }
 
@@ -296,14 +307,32 @@ func (m *StreamMultiplexer) stream(id StreamID, local bool) (*multiplexedStream,
 	if m.cfg.MaxActiveStreams > 0 && len(m.streams) >= m.cfg.MaxActiveStreams {
 		return nil, false, ErrInvalidStreamState
 	}
-	stream := &multiplexedStream{
-		id:         id,
-		state:      StreamIdle,
-		sendWindow: m.initialStreamWin,
-		recvWindow: m.initialStreamWin,
-	}
+	stream := m.acquireStream(id)
 	m.streams[id] = stream
 	return stream, true, nil
+}
+
+func (m *StreamMultiplexer) acquireStream(id StreamID) *multiplexedStream {
+	last := len(m.freeStreams) - 1
+	if last < 0 {
+		return &multiplexedStream{id: id, sendWindow: m.initialStreamWin, recvWindow: m.initialStreamWin}
+	}
+	stream := m.freeStreams[last]
+	m.freeStreams[last] = nil
+	m.freeStreams = m.freeStreams[:last]
+	stream.id = id
+	stream.state = StreamIdle
+	stream.sendWindow = m.initialStreamWin
+	stream.recvWindow = m.initialStreamWin
+	return stream
+}
+
+func (m *StreamMultiplexer) recycleStream(stream *multiplexedStream) {
+	if stream == nil || len(m.freeStreams) >= maxRetainedStreams {
+		return
+	}
+	*stream = multiplexedStream{}
+	m.freeStreams = append(m.freeStreams, stream)
 }
 
 func (m *StreamMultiplexer) validInitiator(id StreamID, local bool) bool {
@@ -325,16 +354,24 @@ func (m *StreamMultiplexer) fireClosedIfNeeded(ctx *channel.HandlerContext, stre
 	}
 	delete(m.streams, stream.id)
 	ctx.FireChannelRead(StreamEvent{Type: StreamEventClosed, StreamID: stream.id, State: StreamClosed})
+	m.recycleStream(stream)
 }
 
 func (m *StreamMultiplexer) closeStream(id StreamID) {
+	stream := m.streams[id]
+	if stream == nil {
+		return
+	}
 	delete(m.streams, id)
+	if !stream.dispatching {
+		m.recycleStream(stream)
+	}
 }
 
 func (m *StreamMultiplexer) closeStreamsAfter(last StreamID) {
 	for id := range m.streams {
 		if id > last {
-			delete(m.streams, id)
+			m.closeStream(id)
 		}
 	}
 }
