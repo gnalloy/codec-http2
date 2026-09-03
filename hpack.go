@@ -306,7 +306,8 @@ func (e *HeaderEncoder) encodeFields(fields []HeaderField) ([]byte, error) {
 			return nil, err
 		}
 	}
-	return append([]byte(nil), e.buf.Bytes()...), nil
+	// 返回值只在下一次 HPACK 编码前有效，调用方必须同步消费。
+	return e.buf.Bytes(), nil
 }
 
 func (e *HeaderEncoder) writeHeaderFrames(ctx *channel.HandlerContext, encoded []byte, firstOverhead int, first func(buffer.ByteBuf, bool) TypedFrame, streamID StreamID) error {

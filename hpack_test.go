@@ -90,6 +90,28 @@ func TestHeaderEncoderTransfersFrameOwnershipOnWriteError(t *testing.T) {
 	}
 }
 
+func BenchmarkHeaderEncoderEncodeFieldsSteadyState(b *testing.B) {
+	encoder, err := NewHeaderEncoder(HeaderCodecConfig{})
+	if err != nil {
+		b.Fatal(err)
+	}
+	fields := []HeaderField{
+		{Name: ":status", Value: "200"},
+		{Name: "content-type", Value: "application/octet-stream"},
+		{Name: "content-length", Value: "128"},
+	}
+	if _, err := encoder.encodeFields(fields); err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if _, err := encoder.encodeFields(fields); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestHeaderDecoderRejectsContinuationWithoutHeaders(t *testing.T) {
 	decoder, err := NewHeaderDecoder(HeaderCodecConfig{})
 	if err != nil {
