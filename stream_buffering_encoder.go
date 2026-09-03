@@ -148,7 +148,6 @@ func (e *StreamBufferingEncoder) writeData(ctx *channel.HandlerContext, frame Da
 		return ErrInvalidStreamState
 	}
 	if err := ctx.Write(frame); err != nil {
-		frame.Release()
 		return err
 	}
 	if frame.Flags&FlagEndStream != 0 {
@@ -172,7 +171,6 @@ func (e *StreamBufferingEncoder) writeRST(ctx *channel.HandlerContext, frame RST
 
 func (e *StreamBufferingEncoder) writeDirect(ctx *channel.HandlerContext, msg any, id StreamID, endStream bool) error {
 	if err := ctx.Write(msg); err != nil {
-		release(msg)
 		return err
 	}
 	if endStream {
@@ -222,7 +220,6 @@ func (e *StreamBufferingEncoder) writeBufferedStream(ctx *channel.HandlerContext
 	for i, frame := range stream.frames {
 		endStream := frameEndsStream(frame)
 		if err := ctx.Write(frame); err != nil {
-			release(frame)
 			stream.frames[i] = nil
 			return err
 		}

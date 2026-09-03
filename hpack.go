@@ -354,11 +354,7 @@ func (e *HeaderEncoder) writeHeaderFrames(ctx *channel.HandlerContext, encoded [
 }
 
 func writeTypedFrame(ctx *channel.HandlerContext, frame TypedFrame) error {
-	if err := ctx.Write(frame); err != nil {
-		frame.Release()
-		return err
-	}
-	return nil
+	return ctx.Write(frame)
 }
 
 func bufferFromBytes(ctx *channel.HandlerContext, data []byte) (buffer.ByteBuf, error) {

@@ -105,7 +105,6 @@ func (h *WriteHandler) Write(ctx *channel.HandlerContext, msg any) error {
 		}
 		if frame.Data != nil || frame.Flags&http2.FlagEndStream != 0 {
 			if err := ctx.Write(frame); err != nil {
-				frame.Release()
 				return err
 			}
 		}

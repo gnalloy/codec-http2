@@ -70,6 +70,26 @@ func TestHeaderCodecRoundTripWithContinuation(t *testing.T) {
 	}
 }
 
+func TestHeaderEncoderTransfersFrameOwnershipOnWriteError(t *testing.T) {
+	wantErr := errors.New("write failed")
+	encoder, err := NewHeaderEncoder(HeaderCodecConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch := channel.NewLocalChannel(1, buffer.NewHeapAllocator(), failingSink{err: wantErr})
+	if err := ch.Pipeline().AddLast("headers", encoder); err != nil {
+		t.Fatal(err)
+	}
+
+	err = ch.Write(HeadersBlock{
+		StreamID: 1,
+		Fields:   []HeaderField{{Name: ":status", Value: "200"}},
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("err=%v, want %v", err, wantErr)
+	}
+}
+
 func TestHeaderDecoderRejectsContinuationWithoutHeaders(t *testing.T) {
 	decoder, err := NewHeaderDecoder(HeaderCodecConfig{})
 	if err != nil {

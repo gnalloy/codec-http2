@@ -148,11 +148,7 @@ func (c *OutboundFlowController) writeData(ctx *channel.HandlerContext, frame Da
 		return c.enqueue(frame, size)
 	}
 	c.consume(frame.StreamID, size)
-	if err := ctx.Write(frame); err != nil {
-		frame.Release()
-		return err
-	}
-	return nil
+	return ctx.Write(frame)
 }
 
 func (c *OutboundFlowController) enqueue(frame DataFrame, size int) error {
@@ -181,7 +177,6 @@ func (c *OutboundFlowController) drain(ctx *channel.HandlerContext) error {
 		c.pendingBytes -= pending.size
 		c.consume(pending.frame.StreamID, pending.size)
 		if err := ctx.Write(pending.frame); err != nil {
-			pending.frame.Release()
 			c.compactPending()
 			return err
 		}

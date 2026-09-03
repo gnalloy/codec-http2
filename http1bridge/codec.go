@@ -198,11 +198,7 @@ func (c *StreamFrameToHTTPObjectCodec) writeDataFrame(ctx *channel.HandlerContex
 		return ctx.Write(http2.DataFrame{StreamID: c.streamID(), Flags: flags})
 	}
 	frame := http2.DataFrame{StreamID: c.streamID(), Flags: flags, Data: data}
-	if err := ctx.Write(frame); err != nil {
-		frame.Release()
-		return err
-	}
-	return nil
+	return ctx.Write(frame)
 }
 
 func (c *StreamFrameToHTTPObjectCodec) fireEmptyLastIfNeeded(ctx *channel.HandlerContext, endStream bool) {

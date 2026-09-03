@@ -157,11 +157,7 @@ func (c *ResponseCompressor) finish(ctx *channel.HandlerContext, streamID http2.
 		flags = http2.FlagEndStream
 	}
 	frame := http2.DataFrame{StreamID: streamID, Flags: flags, Data: encoded}
-	if err := ctx.Write(frame); err != nil {
-		frame.Release()
-		return err
-	}
-	return nil
+	return ctx.Write(frame)
 }
 
 func (c *ResponseCompressor) writePlain(ctx *channel.HandlerContext, state *responseState, endStream bool) error {
@@ -187,11 +183,7 @@ func (c *ResponseCompressor) writePlain(ctx *channel.HandlerContext, state *resp
 	}
 	frame := http2.DataFrame{StreamID: headers.StreamID, Flags: flags, Data: state.body}
 	state.body = nil
-	if err := ctx.Write(frame); err != nil {
-		frame.Release()
-		return err
-	}
-	return nil
+	return ctx.Write(frame)
 }
 
 func (c *ResponseCompressor) response(streamID http2.StreamID) *responseState {

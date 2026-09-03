@@ -201,7 +201,6 @@ func (e *FrameEncoder) Write(ctx *channel.HandlerContext, msg any) error {
 		return err
 	}
 	if err := ctx.Write(out); err != nil {
-		out.Release()
 		frame.Release()
 		return err
 	}
