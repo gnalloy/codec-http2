@@ -112,6 +112,101 @@ func BenchmarkHeaderEncoderEncodeFieldsSteadyState(b *testing.B) {
 	}
 }
 
+func TestHeaderDecoderDecodeFieldsAllocationBudget(t *testing.T) {
+	encoder, err := NewHeaderEncoder(HeaderCodecConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := encoder.encodeFields([]HeaderField{
+		{Name: ":method", Value: "GET"},
+		{Name: ":path", Value: "/"},
+		{Name: ":scheme", Value: "https"},
+		{Name: ":authority", Value: "localhost"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := buffer.NewSharedBuffer(append([]byte(nil), encoded...))
+	decoder, err := NewHeaderDecoder(HeaderCodecConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allocs := testing.AllocsPerRun(1000, func() {
+		fields, decodeErr := decoder.decodeFields(block)
+		if decodeErr != nil {
+			t.Fatal(decodeErr)
+		}
+		decodedHeaderFieldsSink = fields
+	})
+	if allocs > 2 {
+		t.Fatalf("allocs=%f, want <= 2", allocs)
+	}
+}
+
+func BenchmarkHeaderDecoderDecodeFieldsSteadyState(b *testing.B) {
+	encoder, err := NewHeaderEncoder(HeaderCodecConfig{})
+	if err != nil {
+		b.Fatal(err)
+	}
+	encoded, err := encoder.encodeFields([]HeaderField{
+		{Name: ":method", Value: "GET"},
+		{Name: ":path", Value: "/"},
+		{Name: ":scheme", Value: "https"},
+		{Name: ":authority", Value: "localhost"},
+	})
+	if err != nil {
+		b.Fatal(err)
+	}
+	block := buffer.NewSharedBuffer(append([]byte(nil), encoded...))
+	decoder, err := NewHeaderDecoder(HeaderCodecConfig{})
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		fields, decodeErr := decoder.decodeFields(block)
+		if decodeErr != nil {
+			b.Fatal(decodeErr)
+		}
+		decodedHeaderFieldsSink = fields
+	}
+}
+
+var decodedHeaderFieldsSink []HeaderField
+
+func TestHeaderDecoderRemainsSynchronizedAfterHeaderListLimit(t *testing.T) {
+	encoder, err := NewHeaderEncoder(HeaderCodecConfig{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oversized, err := encoder.encodeFields([]HeaderField{{Name: "x-large", Value: "0123456789012345678901234567890123456789"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oversized = append([]byte(nil), oversized...)
+	valid, err := encoder.encodeFields([]HeaderField{{Name: ":method", Value: "GET"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid = append([]byte(nil), valid...)
+
+	decoder, err := NewHeaderDecoder(HeaderCodecConfig{MaxHeaderListSize: 64})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := decoder.decodeFields(buffer.NewSharedBuffer(oversized)); !errors.Is(err, ErrHeaderListTooLarge) {
+		t.Fatalf("err=%v, want ErrHeaderListTooLarge", err)
+	}
+	fields, err := decoder.decodeFields(buffer.NewSharedBuffer(valid))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fields) != 1 || fields[0].Name != ":method" || fields[0].Value != "GET" {
+		t.Fatalf("fields=%+v", fields)
+	}
+}
+
 func TestHeaderDecoderRejectsContinuationWithoutHeaders(t *testing.T) {
 	decoder, err := NewHeaderDecoder(HeaderCodecConfig{})
 	if err != nil {

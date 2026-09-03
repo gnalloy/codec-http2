@@ -49,6 +49,9 @@ type HeaderDecoder struct {
 	decoder           *hpack.Decoder
 	maxHeaderListSize uint32
 	pending           *pendingHeaderBlock
+	fields            []HeaderField
+	headerListSize    uint64
+	decodeErr         error
 }
 
 // HeaderEncoder 把字段编码为 HPACK 压缩块并按帧大小拆分。
@@ -81,11 +84,13 @@ func NewHeaderDecoder(cfg HeaderCodecConfig) (*HeaderDecoder, error) {
 	if size == 0 {
 		size = 4096
 	}
-	decoder := hpack.NewDecoder(size, nil)
+	d := &HeaderDecoder{maxHeaderListSize: cfg.MaxHeaderListSize}
+	decoder := hpack.NewDecoder(size, d.emitField)
 	if cfg.MaxStringLength > 0 {
 		decoder.SetMaxStringLength(cfg.MaxStringLength)
 	}
-	return &HeaderDecoder{decoder: decoder, maxHeaderListSize: cfg.MaxHeaderListSize}, nil
+	d.decoder = decoder
+	return d, nil
 }
 
 // NewHeaderEncoder 创建 HTTP/2 HPACK header encoder。
@@ -234,20 +239,38 @@ func (d *HeaderDecoder) decodeFields(block buffer.ByteBuf) ([]HeaderField, error
 	if block == nil {
 		return nil, nil
 	}
-	fields, err := d.decoder.DecodeFull(block.Bytes())
-	if err != nil {
-		return nil, err
+	d.fields = make([]HeaderField, 0, 8)
+	d.headerListSize = 0
+	d.decodeErr = nil
+	d.decoder.SetEmitEnabled(true)
+	_, writeErr := d.decoder.Write(block.Bytes())
+	closeErr := d.decoder.Close()
+	fields := d.fields
+	d.fields = nil
+	if writeErr != nil {
+		return nil, writeErr
 	}
-	out := make([]HeaderField, 0, len(fields))
-	var size uint32
-	for _, field := range fields {
-		size += uint32(len(field.Name) + len(field.Value) + 32)
-		if d.maxHeaderListSize > 0 && size > d.maxHeaderListSize {
-			return nil, ErrHeaderListTooLarge
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	if d.decodeErr != nil {
+		return nil, d.decodeErr
+	}
+	return fields, nil
+}
+
+func (d *HeaderDecoder) emitField(field hpack.HeaderField) {
+	size := uint64(len(field.Name)) + uint64(len(field.Value)) + 32
+	if d.maxHeaderListSize > 0 {
+		limit := uint64(d.maxHeaderListSize)
+		if size > limit || d.headerListSize > limit-size {
+			d.decodeErr = ErrHeaderListTooLarge
+			d.decoder.SetEmitEnabled(false)
+			return
 		}
-		out = append(out, HeaderField{Name: field.Name, Value: field.Value, Sensitive: field.Sensitive})
 	}
-	return out, nil
+	d.headerListSize += size
+	d.fields = append(d.fields, HeaderField{Name: field.Name, Value: field.Value, Sensitive: field.Sensitive})
 }
 
 func (e *HeaderEncoder) writeHeaders(ctx *channel.HandlerContext, block HeadersBlock) error {
